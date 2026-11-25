@@ -4,9 +4,11 @@ Log of the decisions of the study, in the order they were taken: first while bui
 pilot instruments (2026-11-04), before any LLM run, then after the pilot runs, for the final
 experiment and for the local replication (2026-11-05 and 2026-11-06). A later section can
 replace an earlier decision; the earlier text stays, with a note that points to the change.
-The study design is in the roteiro (`entregas/02-hipoteses-e-planejamento/roteiro_experimental.tex`,
-31/10/2026). Items marked **Deviation** change or refine a sentence of the roteiro and
-must be carried into the next planning document.
+The study design is in the roteiro, the experimental plan written for the course (31/10/2026),
+which is not part of this package; the paper describes the final design. Items marked
+**Deviation** change or refine a sentence of the roteiro and must be carried into the next
+planning document. Commit hashes cited here belong to the development repository, which is
+private; this package starts from a snapshot of it.
 
 ## Experimental object
 
@@ -676,14 +678,14 @@ seed 20261124 (fixed before the runs), database `monosplit`.
   variable first. The attempt produced no model output and is stored as `api_error`. The run
   was resumed with the variable removed from the process (`env -u OPENAI_API_KEY`), so the
   saved key was used, with the same configuration. No code changed.
-- Totals, timing and cost: see the article (`entregas/03-artigo` of the course repository) and
-  the Results page; they come from the database through `gerar_dados.py`.
+- Totals, timing and cost: see the paper and the Results page; they come from the database
+  through `scripts/gerar_dados.py`.
 
 ### Article
 
-The article is generated from this database: `entregas/03-artigo/gerar_dados.py` (in the course
-repository, outside this package) reads `results_payload` and writes the tables, the figure and
-every number quoted in the text. The main run is `final`; `full` is reported as a second run of
+The paper is generated from this database: `scripts/gerar_dados.py` reads `results_payload`
+and writes the tables, the figure and every number quoted in the text (see the README,
+section *Reproducing the paper*). The main run is `final`; `full` is reported as a second run of
 the protocol (keys prefixed `rep-`, a table of both runs' pooled tests and the agreement between
 them). Both gave the same outcome in the 16 pooled comparisons and the same 4 pooled verdicts;
 per application, 3 of the 16 verdicts differ, each through one condition (NED against the

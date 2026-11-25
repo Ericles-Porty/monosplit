@@ -337,6 +337,27 @@ GitHub Pages) or opened from any static web server. It is read-only.
 - The dump in `dump/monosplit/` holds the configuration, every graph, attempt, raw response
   and evaluation, and the change log; `db restore` rebuilds the database from it, and
   dumping again gives the same files.
+- Commit hashes cited in this README and in `docs/` belong to the development repository,
+  which is private; this package starts from a snapshot of it.
+
+### Reproducing the paper
+
+The tables, the figure and every number quoted in the paper come from the database through
+`scripts/gerar_dados.py`. From the root of this package, on a fresh clone:
+
+```
+docker compose up -d
+uv sync --all-extras
+uv run python -m monosplit db restore dump
+uv run python scripts/gerar_dados.py                 # writes work/paper-data/en/
+```
+
+No model is called. The script reads the stored metric rows of the main run (experiment
+`final`) and of the second run (experiment `full`), computes the paired tests and the
+comparison criterion from them, as the Results page does, and writes `numeros.tex` (every
+number of the text as `\dado{key}`), the `tab_*.tex` tables, `fig_diferencas.tex` and
+`resultados.json` (the full payload). `--idioma pt` writes the Portuguese labels used by a
+study version of the paper; `--saida <folder>` writes to another folder.
 
 ## Tests
 

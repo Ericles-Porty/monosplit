@@ -1,32 +1,36 @@
-"""Gera os dados do artigo a partir do banco do experimento: tabelas, figura e numeros do texto.
+"""Generate the data of the paper from the study database: tables, figure and the numbers of the text.
 
-Nenhum numero de resultado do artigo e digitado a mao. Este script le o banco pelas mesmas
-funcoes da pagina Resultados da interface (monosplit.api.payloads.results_payload) e grava
-fragmentos LaTeX que o artigo inclui com \\input.
+No result number of the paper is typed by hand. This script reads the database through the same
+functions as the Results page of the web interface (monosplit.api.payloads.results_payload) and
+writes LaTeX fragments that the paper includes with \\input.
 
-Uso, de dentro de experimento/ (com o MongoDB no ar, `docker compose up -d`):
+Usage, from the root of this package, with MongoDB running (`docker compose up -d`) and the
+database restored from the dump (`uv run python -m monosplit db restore dump`):
 
-    uv run python ../entregas/03-artigo/gerar_dados.py                 # ingles, em dados/
-    uv run python ../entregas/03-artigo/gerar_dados.py --idioma pt     # portugues, em dados_pt/
-    uv run python ../entregas/03-artigo/gerar_dados.py --experiment full --profile gpt-6.1-sol-high
+    uv run python scripts/gerar_dados.py                    # English, in work/paper-data/en/
+    uv run python scripts/gerar_dados.py --idioma pt        # Portuguese, in work/paper-data/pt/
+    uv run python scripts/gerar_dados.py --saida <folder>   # another output folder
 
-O ingles alimenta artigo.tex e artigo_anonimo.tex; o portugues alimenta artigo_pt.tex, a versao
-de estudo. Em portugues, os rotulos sao traduzidos e os numeros usam virgula decimal, escrita
-como {,} para funcionar tanto no texto quanto em modo matematico.
+By default the main run is the experiment `final` and the second run of the protocol is the
+experiment `full` (keys prefixed rep-); see --experiment, --replicacao and --profile. The
+Portuguese output translates the labels and uses a decimal comma, written as {,} so that it
+works both in text and in math mode.
 
-Arquivos gravados (em dados/, dados_pt/ ou na pasta de --saida):
+Files written:
 
-    numeros.tex          \\dado{chave}: cada numero citado no texto (tentativas, custo, p, delta...)
-    tab_execucoes.tex    execucoes do LLM por aplicacao e variante
-    tab_descritiva.tex   mediana e intervalo interquartil das metricas por metodo
-    tab_testes.tex       testes pareados, ajuste de Holm e delta de Cliff (quatro aplicacoes juntas)
-    tab_criterio.tex     condicoes do criterio de comparacao, por variante e controle
-    tab_ah.tex           mediana de SM das seis variantes do AH, do LLM e da particao aleatoria
-    tab_por_aplicacao.tex  resultado dos testes de cada aplicacao sozinha (10 pares)
-    fig_diferencas.tex   figura das diferencas pareadas (pgfplots)
-    resultados.json      o payload completo usado, para conferencia
+    numeros.tex            \\dado{key}: every number quoted in the text (attempts, cost, p, delta...)
+    tab_execucoes.tex      LLM runs per application and name variant
+    tab_descritiva.tex     median and interquartile range of the metrics per method
+    tab_testes.tex         paired tests, Holm adjustment and Cliff's delta (four applications pooled)
+    tab_criterio.tex       conditions of the comparison criterion, per variant and control
+    tab_ah.tex             median SM of the six AH variants, of the LLM and of the random partition
+    tab_por_aplicacao.tex  tests of each application alone (10 pairs)
+    tab_replicacao.tex     pooled tests of the main run and of the second run
+    fig_diferencas.tex     figure of the paired differences (pgfplots)
+    resultados.json        the complete payload used, for checking
 
-Rode o script de novo sempre que o banco mudar, e recompile o artigo.
+Run the script again whenever the database changes. In the course repository, the paper reads
+the output of `--saida ../entregas/03-artigo/dados` (and `dados_pt` for --idioma pt).
 """
 from __future__ import annotations
 
@@ -39,6 +43,7 @@ from datetime import datetime, timedelta, timezone
 from pathlib import Path
 
 from monosplit.api.payloads import results_payload, study_key
+from monosplit.paths import WORK_DIR
 from monosplit.store import open_store
 
 APPS = ("jpetstore", "acmeair", "daytrader", "plants")
@@ -49,9 +54,9 @@ METRICS = ("sm", "ifn", "icp", "ned")
 METRIC_NAMES = {"sm": "SM", "ifn": "IFN", "icp": "ICP", "ned": "NED"}
 AH_ORDER = ("calls:average", "calls:complete", "calls:single",
             "neighbors:average", "neighbors:complete", "neighbors:single")
-LOCAL = timezone(timedelta(hours=-3))  # horario de Brasilia, em que as execucoes foram feitas
+LOCAL = timezone(timedelta(hours=-3))  # Brasilia time (UTC-3), where the runs were made
 
-# Idioma da saida, definido em main() por --idioma.
+# Language of the output, set in main() by --idioma.
 IDIOMA = "en"
 
 MESES = ("janeiro", "fevereiro", "março", "abril", "maio", "junho", "julho", "agosto",
@@ -136,21 +141,21 @@ TEXTOS = {
 
 
 def tx(chave: str):
-    """Texto do idioma da saida."""
+    """Text in the output language."""
     return TEXTOS[IDIOMA][chave]
 
 
 # ------------------------------------------------------------------ formatacao
 
 def loc(numero: str) -> str:
-    """Separadores do idioma. Em portugues, ponto de milhar e virgula decimal, escrita como {,}."""
+    """Separators of the output language. In Portuguese, a thousands point and a decimal comma, written as {,}."""
     if IDIOMA != "pt":
         return numero
     return numero.replace(",", "\0").replace(".", "{,}").replace("\0", ".")
 
 
 def signed(text: str) -> str:
-    """Troca o sinal de menos pelo do LaTeX e tira o sinal de um zero arredondado (-0.000)."""
+    """Use the LaTeX minus sign and drop the sign of a rounded zero (-0.000)."""
     if text.startswith("-") and float(text) == 0:
         text = text[1:]
     return loc(text).replace("-", "\\textminus ")
@@ -165,7 +170,7 @@ def f2(x: float | None) -> str:
 
 
 def fp(p: float | None) -> str:
-    """Valor-p: tres casas, ou < 0,001."""
+    """p-value: three decimals, or < 0.001."""
     if p is None:
         return "--"
     return loc("$<$0.001" if p < 0.001 else f"{p:.3f}")
@@ -188,7 +193,7 @@ def run_date(dt: datetime) -> str:
 
 
 class Numbers:
-    """Colecao de \\dado{chave}{valor}."""
+    """Collection of \\dado{key}{value}."""
 
     def __init__(self) -> None:
         self.items: dict[str, str] = {}
@@ -197,7 +202,7 @@ class Numbers:
         self.items[key] = str(value)
 
     def merge(self, other: "Numbers", prefix: str) -> None:
-        """Acrescenta as chaves de outra colecao com um prefixo (replicacao: rep-)."""
+        """Add the keys of another collection with a prefix (second run: rep-)."""
         for key, value in other.items.items():
             self.items[f"{prefix}{key}"] = value
 
@@ -228,7 +233,7 @@ def load(experiment: str, profile: str) -> tuple[dict, dict]:
 
 
 def service_sizes(row: dict) -> list[int]:
-    """Tamanhos dos servicos de uma particao medida (lista de pares [classe, servico])."""
+    """Service sizes of a measured partition (list of [class, service] pairs)."""
     counts: dict = defaultdict(int)
     for _cls, service in row.get("partition") or []:
         counts[service] += 1
@@ -323,7 +328,7 @@ def numbers_from(payload: dict, extra: dict) -> Numbers:
         value = loc(f"{s['median']:g}") if s["metric"] == "k" else fmt(s["metric"], s["median"])
         n[f"{s['app']}-{s['variant']}-{s['method'].replace(':', '-')}-{s['metric']}-median"] = value
 
-    # Tamanho do maior servico (classes), por metodo, nas particoes medidas de cada execucao.
+    # Size of the largest service (classes), per method, in the measured partitions of each run.
     for app in APPS:
         classes = next((a["graph"] or {}).get("classes") for a in payload["apps"] if a["app"] == app)
         for variant in VARIANTS:
@@ -338,7 +343,7 @@ def numbers_from(payload: dict, extra: dict) -> Numbers:
                     n[f"{key}-share"] = f"{100 * statistics.median(largest) / classes:.0f}"
             runs = extra["runs"][(app, variant)]
             if runs:
-                # Execucoes que devolveram a particao mais frequente (os nomes dos servicos nao contam).
+                # Runs that returned the most frequent partition (service names do not count).
                 shapes = defaultdict(int)
                 for r in runs:
                     shapes[frozenset(frozenset(s["classes"]) for s in r["services"])] += 1
@@ -347,7 +352,7 @@ def numbers_from(payload: dict, extra: dict) -> Numbers:
                 n[f"{app}-{variant}-run1-services"] = ", ".join(
                     f"\\texttt{{{tex_escape(s['name'])}}} ({len(s['classes'])})" for s in first_run["services"])
 
-    # HDBSCAN: uma particao por aplicacao e distancia, com K proprio (referencia descritiva).
+    # HDBSCAN: one partition per application and distance, with its own K (descriptive reference).
     for r in payload["metrics"]:
         if r["method"].startswith("hdbscan"):
             key = f"{r['app']}-{r['method'].replace(':', '-')}"
@@ -527,11 +532,11 @@ def table_criterion(payload: dict) -> str:
 
 
 def table_per_app(payload: dict) -> str:
-    """Resultado dos testes de cada aplicacao sozinha (10 pares por linha, Holm sobre as oito linhas).
+    """Tests of each application alone (10 pairs per row, Holm over the eight rows).
 
-    Cada celula traz um simbolo por metrica, na ordem SM, IFN, ICP, NED: + diferenca
-    significativa a favor do LLM, \\textminus{} a favor do controle, 0 nao significativa.
-    O sinal de adaga marca a celula em que o criterio adotado, (i) a (iv), e satisfeito.
+    Each cell has one symbol per metric, in the order SM, IFN, ICP, NED: + significant
+    difference in favour of the LLM, \\textminus{} in favour of the control, 0 not significant.
+    The dagger marks the cells where the adopted criterion, (i) to (iv), holds.
     """
     blocks = {(b["scope"], b["variant"]): b for b in payload["tests"] or []}
     symbol = {"llm": "+", "control": "$-$"}
@@ -588,8 +593,8 @@ def table_ah(payload: dict) -> str:
 
 
 def outcomes(payload: dict) -> tuple[dict, dict, dict]:
-    """Resultado de cada comparacao (LLM, controle ou nenhum), magnitude do delta e veredito do
-    criterio adotado, por (escopo, variante, controle[, metrica])."""
+    """Outcome of each comparison (LLM, control or none), magnitude of delta and verdict of the
+    adopted criterion, by (scope, variant, control[, metric])."""
     result, magnitude, verdict = {}, {}, {}
     for block in payload["tests"] or []:
         for c in block["comparisons"]:
@@ -603,7 +608,7 @@ def outcomes(payload: dict) -> tuple[dict, dict, dict]:
 
 
 def replication_numbers(main: dict, rep: dict) -> Numbers:
-    """Concordancia entre a execucao principal e a segunda execucao do protocolo."""
+    """Agreement between the main run and the second run of the protocol."""
     n = Numbers()
     res_m, mag_m, ver_m = outcomes(main)
     res_r, mag_r, ver_r = outcomes(rep)
@@ -631,8 +636,8 @@ def replication_numbers(main: dict, rep: dict) -> Numbers:
 
 
 def table_replication(main: dict, rep: dict) -> str:
-    """Teste agrupado de cada comparacao nas duas execucoes do protocolo: delta de Cliff e
-    metodo favorecido por uma diferenca significativa (-- quando nao significativa)."""
+    """Pooled test of each comparison in the two runs of the protocol: Cliff's delta and the
+    method favoured by a significant difference (-- when not significant)."""
     def cell(payload: dict, variant: str, control: str, metric: str) -> str:
         block = next(b for b in payload["tests"] if b["scope"] == "all" and b["variant"] == variant)
         c = next(r for r in block["comparisons"] if r["control"] == control and r["metric"] == metric)
@@ -666,7 +671,7 @@ ROWS = [("original", "ah"), ("original", "random"), ("obfuscated", "ah"), ("obfu
 
 
 def jitter(*parts) -> float:
-    """Deslocamento vertical deterministico em [-0.28, 0.28], para os pontos nao se sobreporem."""
+    """Deterministic vertical offset in [-0.28, 0.28], so that the markers do not overlap."""
     h = zlib.crc32("/".join(map(str, parts)).encode()) / 0xFFFFFFFF
     return (h - 0.5) * 0.56
 
@@ -717,22 +722,22 @@ def figure_differences(payload: dict) -> str:
 def main() -> None:
     global IDIOMA
     parser = argparse.ArgumentParser(description=__doc__, formatter_class=argparse.RawDescriptionHelpFormatter)
-    parser.add_argument("--experiment", default="final", help="experimento principal do artigo")
+    parser.add_argument("--experiment", default="final", help="main run of the paper (default: final)")
     parser.add_argument("--replicacao", default="full",
-                        help="segunda execucao do mesmo protocolo (chaves rep-...); vazio para nenhuma")
-    parser.add_argument("--profile", default="gpt-6.1-sol-high")
+                        help="second run of the same protocol, keys prefixed rep- (default: full); empty for none")
+    parser.add_argument("--profile", default="gpt-6.1-sol-high", help="LLM profile (default: gpt-6.1-sol-high)")
     parser.add_argument("--idioma", choices=sorted(TEXTOS), default="en",
-                        help="en: rotulos em ingles (artigo.tex); pt: em portugues, com virgula decimal (artigo_pt.tex)")
-    parser.add_argument("--saida", default=None, help="pasta de saida; padrao dados/ (en) ou dados_pt/ (pt)")
+                        help="output language: en (the paper) or pt (Portuguese study version, decimal comma)")
+    parser.add_argument("--saida", default=None,
+                        help="output folder, relative to the current folder (default: work/paper-data/<idioma>)")
     args = parser.parse_args()
     IDIOMA = args.idioma
-    padrao = "dados" if IDIOMA == "en" else f"dados_{IDIOMA}"
-    out = Path(args.saida) if args.saida else Path(__file__).resolve().parent / padrao
+    out = Path(args.saida).resolve() if args.saida else WORK_DIR / "paper-data" / IDIOMA
     out.mkdir(parents=True, exist_ok=True)
 
     payload, extra = load(args.experiment, args.profile)
     if not payload["analysis"]["inferential"]:
-        raise SystemExit("O experimento nao tem os testes ligados (inferential = false).")
+        raise SystemExit("The experiment does not have the tests turned on (inferential = false).")
     numbers = numbers_from(payload, extra)
     if args.replicacao:
         rep_payload, rep_extra = load(args.replicacao, args.profile)
@@ -749,7 +754,7 @@ def main() -> None:
     (out / "fig_diferencas.tex").write_text(figure_differences(payload), encoding="utf-8")
     (out / "resultados.json").write_text(json.dumps(payload, indent=1, ensure_ascii=False, sort_keys=True) + "\n",
                                          encoding="utf-8")
-    print(f"dados gravados em {out}")
+    print(f"data written to {out}")
 
 
 if __name__ == "__main__":

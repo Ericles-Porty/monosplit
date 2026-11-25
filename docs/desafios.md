@@ -5,7 +5,9 @@ pilotos, o que foi medido, o que foi feito e o que cada um implica para o artigo
 as decisões completas estão em [decisions.md](decisions.md). Os itens marcados como **Desvio**
 mudam uma frase do roteiro e devem ser declarados no artigo. Os números dos pilotos são
 descritivos: não são resultados do experimento. Os dados dos pilotos estão no dump do
-commit ff068b7; o banco foi limpo depois para o experimento final.
+commit ff068b7; o banco foi limpo depois para o experimento final. Os *hashes* de commit
+citados aqui são do repositório de desenvolvimento, que é privado; este pacote começa de uma
+cópia dele.
 
 Acrescente aqui os desafios que surgirem nas execuções do experimento completo. A replicação
 com modelos locais foi abandonada (item 15).

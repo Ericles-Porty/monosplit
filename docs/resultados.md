@@ -4,8 +4,8 @@ Material para o artigo: os resultados do experimento final, com os números da a
 planejada no roteiro. O experimento é `final`, com o perfil `gpt-6.1-sol-high` (OpenAI
 `gpt-6.1-sol`, `reasoning_effort` high, temperatura padrão da API), prompt
 `decomposition_base` e semente mestra 1793933766, executado em 2026-11-06. Os dados estão no
-dump do commit fa56258, e os mesmos números aparecem na página de Resultados (experimento
-`final`, perfil `gpt-6.1-sol-high`). As decisões de método estão em
+dump deste pacote (`dump/monosplit/`), e os mesmos números aparecem na página de Resultados
+(experimento `final`, perfil `gpt-6.1-sol-high`). As decisões de método estão em
 [decisions.md](decisions.md) e os problemas encontrados em [desafios.md](desafios.md).
 
 Convenções:
