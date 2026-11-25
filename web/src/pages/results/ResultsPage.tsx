@@ -1,0 +1,266 @@
+import { useResource } from "../../api/client";
+import type { IndexPayload, ResultsPayload } from "../../api/types";
+import { navigate, type Params } from "../../app/router";
+import { Notice } from "../../components/forms";
+import { Term } from "../../components/Term";
+import { fileName, toCsv } from "../../export/files";
+import { useI18n } from "../../i18n/I18n";
+import { scopeApps, resultSets } from "./data";
+import { differencesCsv, differencesLatex, metricsCsv, metricsLatex, testsCsv, testsLatex, type ExportContext } from "./exporters";
+import { ExportBar, FigureBlock, differenceSpec, distributionSpec, tableActions } from "./figures";
+import {
+  AhSelectionTable,
+  CriterionSection,
+  DifferencesTable,
+  MetricsSummaryTable,
+  RunsTable,
+  StabilityTable,
+  TestsTable,
+  ValuesTable,
+} from "./tables";
+
+function describeModel(data: ResultsPayload, t: ReturnType<typeof useI18n>["t"]): string {
+  const options = Object.entries(data.request_options).map(
+    ([key, value]) => `${key} = ${typeof value === "object" ? JSON.stringify(value) : String(value)}`,
+  );
+  const temperature = data.temperature === null ? t.results.apiDefault : String(data.temperature);
+  return [`${data.provider ?? ""} · ${data.model ?? ""}`, ...options, `${t.results.temperature}: ${temperature}`].join(" · ");
+}
+
+export function ResultsPage({ index, params }: { index: IndexPayload; params: Record<string, string> }) {
+  const { t, fmt } = useI18n();
+  const r = t.results;
+  const sets = resultSets(index);
+  const set = sets.find((s) => s.id === params.set) ?? sets[0];
+  const resource = useResource<ResultsPayload>(set ? `results/${set.id}` : null);
+  const data = resource.data?.id === set?.id ? resource.data : undefined;
+
+  if (!set) return <p className="note">{r.noResults}</p>;
+
+  const update = (patch: Params) =>
+    navigate("results", { set: set.id, variant: params.variant, scope: params.scope, ah: params.ah, ...patch }, true);
+
+  const filters = (
+    <div className="control-row">
+      <label className="field">
+        <span className="label">
+          <Term k="set">{r.set}</Term>
+        </span>
+        <select value={set.id} onChange={(event) => navigate("results", { set: event.target.value })}>
+          {sets.map((s) => (
+            <option key={s.id} value={s.id}>
+              {s.experiment} · {s.profile}
+            </option>
+          ))}
+        </select>
+      </label>
+      {data ? (
+        <>
+          <div className="field">
+            <span className="label">
+              <Term k="variant">{r.variant}</Term>
+            </span>
+            <div className="segmented">
+              {data.variants.map((v) => (
+                <button key={v} type="button" aria-pressed={v === (data.variants.includes(params.variant) ? params.variant : data.variants[0])} onClick={() => update({ variant: v })}>
+                  {t.variants[v] ?? v}
+                </button>
+              ))}
+            </div>
+          </div>
+          {data.scopes.length > 1 ? (
+            <label className="field">
+              <span className="label">
+                <Term k="scope">{r.scope}</Term>
+              </span>
+              <select value={data.scopes.includes(params.scope) ? params.scope : "all"} onChange={(event) => update({ scope: event.target.value === "all" ? undefined : event.target.value })}>
+                {data.scopes.map((s) => (
+                  <option key={s} value={s}>
+                    {s === "all" ? r.scopeAll : (data.apps.find((a) => a.app === s)?.name ?? s)}
+                  </option>
+                ))}
+              </select>
+            </label>
+          ) : null}
+          <label className="check">
+            <input type="checkbox" checked={params.ah === "all"} onChange={() => update({ ah: params.ah === "all" ? undefined : "all" })} />
+            <Term k="ahAll">{r.ahAll}</Term>
+          </label>
+        </>
+      ) : null}
+    </div>
+  );
+
+  if (resource.error) {
+    return (
+      <>
+        {filters}
+        <p className="error">{t.common.loadError}</p>
+      </>
+    );
+  }
+  if (!data) {
+    return (
+      <>
+        {filters}
+        <p className="note">{t.common.loading}</p>
+      </>
+    );
+  }
+
+  const variant = data.variants.includes(params.variant) ? params.variant : data.variants[0];
+  const scope = data.scopes.includes(params.scope) ? params.scope : "all";
+  const allAh = params.ah === "all";
+  const apps = data.apps.filter((a) => scopeApps(data, scope).includes(a.app));
+  const evaluatedApps = apps.filter((a) => a.evaluated);
+  const missing = apps.filter((a) => !a.evaluated).map((a) => a.name);
+  const scopeLabel = scope === "all" ? (data.apps.length > 1 ? r.scopeAll.toLowerCase() : data.apps[0].name) : (data.apps.find((a) => a.app === scope)?.name ?? scope);
+  const context: ExportContext = {
+    t,
+    fmt,
+    data,
+    setLabel: r.captionSet(data.experiment, data.profile),
+    source: `Generated by MonoSplit ${index.version} from results/${data.id} on ${new Date().toISOString().slice(0, 10)}.`,
+  };
+  const base = (...parts: string[]) => fileName("monosplit", data.experiment, data.profile, ...parts);
+  const testSet = data.tests?.find((x) => x.scope === scope && x.variant === variant);
+  const variantName = t.variants[variant] ?? variant;
+
+  return (
+    <>
+      {filters}
+      <div className="results-meta">
+        <span className={data.analysis.inferential ? "chip accent" : "chip"}>
+          <Term k={data.analysis.inferential ? "inferential" : "descriptive"}>{data.analysis.inferential ? r.inferential : r.descriptive}</Term>
+        </span>
+        <span>
+          <Term k="modelConfig">{r.model}</Term>: <span className="mono">{describeModel(data, t)}</span>
+        </span>
+        {data.prompt_template ? (
+          <span>
+            <Term k="promptVersion">{r.prompt}</Term>: <span className="mono">{data.prompt_template}</span>
+          </span>
+        ) : null}
+        <span>
+          <Term k="experimentConfig">{data.analysis.configs.length ? r.configFiles(data.analysis.configs.join(", ")) : r.noConfigFile}</Term>
+        </span>
+      </div>
+      {data.fake ? <Notice kind="warn">{r.fakeWarning}</Notice> : null}
+      {!data.analysis.inferential && !data.fake ? <p className="note">{r.descriptiveNote}</p> : null}
+      {missing.length ? <Notice kind="warn">{r.notEvaluated(missing.join(", "))}</Notice> : null}
+
+      <section className="section">
+        <div className="section-head">
+          <h2>
+            <Term k="run">{r.sections.runs}</Term>
+          </h2>
+          <ExportBar
+            actions={tableActions(t, base("runs"), () =>
+              toCsv(
+                ["experiment", "profile", "app", "variant", "attempts", "accepted", "invalid", "invalid_reasons", "api_errors", "k_accepted", "input_tokens", "output_tokens", "latency_s", "cost_usd"],
+                data.apps.flatMap((a) => a.variants.map((v) => ({ ...v, stability: undefined, experiment: data.experiment, profile: data.profile, app: a.app }))),
+              ),
+            )}
+          />
+        </div>
+        <p className="note">{r.runs.note}</p>
+        <RunsTable data={data} />
+      </section>
+
+      {evaluatedApps.length ? (
+        <>
+          <section className="section">
+            <h2>
+              <Term k="metricsByMethod">{r.sections.distributions}</Term>
+            </h2>
+            <p className="note">{r.distributions.note}</p>
+            <p className="note">{r.exportNote}</p>
+            {evaluatedApps.map((app) => (
+              <FigureBlock
+                key={`${app.app}/${variant}/${allAh}`}
+                title={r.distributions.figureTitle(app.name, variantName)}
+                build={distributionSpec(t, fmt, data, app, variant, allAh)}
+                fileBase={base(app.app, variant, "metrics")}
+                actions={tableActions(t, base(app.app, variant, "metrics"), () => metricsCsv(data, app.app, variant), () => metricsLatex(context, app, variant, allAh))}
+              >
+                <h4 className="table-title">
+                  <Term k="q1q3">{r.distributions.tableTitle}</Term>
+                </h4>
+                <MetricsSummaryTable data={data} app={app} variant={variant} allAh={allAh} />
+                <details className="block">
+                  <summary>{r.distributions.valuesTitle}</summary>
+                  <div className="block-body">
+                    <ValuesTable data={data} app={app} variant={variant} allAh={allAh} />
+                  </div>
+                </details>
+              </FigureBlock>
+            ))}
+          </section>
+
+          <section className="section">
+            <h2>
+              <Term k="pairedDifference">{r.sections.differences}</Term>
+            </h2>
+            <p className="note">{r.differences.note}</p>
+            <FigureBlock
+              key={`${scope}/${variant}`}
+              title={r.differences.figureTitle(scopeLabel, variantName)}
+              build={differenceSpec(t, fmt, data, scope, variant, scopeLabel)}
+              fileBase={base(scope, variant, "differences")}
+              actions={tableActions(t, base(scope, variant, "differences"), () => differencesCsv(data, scope, variant), () => differencesLatex(context, scope, variant, scopeLabel))}
+            >
+              <h4 className="table-title">
+                <Term k="signs">{r.differences.tableTitle}</Term>
+              </h4>
+              <DifferencesTable data={data} scope={scope} variant={variant} />
+            </FigureBlock>
+          </section>
+
+          <section className="section">
+            <div className="section-head">
+              <h2>
+                <Term k="inferential">{r.sections.tests}</Term>
+              </h2>
+              {testSet ? (
+                <ExportBar actions={tableActions(t, base(scope, variant, "tests"), () => testsCsv(data, testSet), () => testsLatex(context, testSet, scopeLabel))} />
+              ) : null}
+            </div>
+            {!data.analysis.inferential ? (
+              <>
+                <Notice kind="warn">{r.tests.off}</Notice>
+                <p className="note">{r.tests.offPlan}</p>
+              </>
+            ) : testSet ? (
+              <>
+                <p className="note">{r.tests.note(fmt.number(data.analysis.alpha, 2))}</p>
+                <p className="note">
+                  {r.tests.scopeNote(testSet.apps.map((a) => data.apps.find((x) => x.app === a)?.name ?? a).join(", "), testSet.comparisons[0]?.n ?? 0)}
+                </p>
+                {variant !== "original" ? <p className="note">{r.tests.obfuscatedNote}</p> : null}
+                <TestsTable set={testSet} />
+                <CriterionSection set={testSet} />
+              </>
+            ) : null}
+          </section>
+
+          <section className="section">
+            <h2>
+              <Term k="ahSelection">{r.sections.ahSelection}</Term>
+            </h2>
+            <p className="note">{r.ahSelection.note}</p>
+            <AhSelectionTable data={data} />
+          </section>
+        </>
+      ) : null}
+
+      <section className="section">
+        <h2>
+          <Term k="stability">{r.sections.stability}</Term>
+        </h2>
+        <p className="note">{r.stability.note}</p>
+        <StabilityTable data={data} />
+      </section>
+
+    </>
+  );
+}

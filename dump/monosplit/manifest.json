@@ -1,0 +1,17 @@
+{
+  "database": "monosplit",
+  "monosplit": "0.1.0",
+  "counts": {
+    "apps": 4,
+    "profiles": 7,
+    "prompts": 1,
+    "experiments": 9,
+    "graphs": 4,
+    "variants": 16,
+    "attempts": 161,
+    "evaluations": 8,
+    "metrics": 1296,
+    "notes": 0,
+    "audit": 123
+  }
+}

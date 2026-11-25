@@ -1,0 +1,24 @@
+# Prompt template decomposition_base, the default prompt of the tool. Same text as
+# decomposition_v1, written before the pilot runs.
+# Placeholders: $class_count, $class_list, $edge_count, $call_count, $edge_list.
+# Lines before the first section marker are comments and are not sent.
+### system
+You are a software architect experienced in migrating monolithic applications to microservices.
+### user
+Decompose the monolithic Java application described below into microservices.
+
+The input lists the application's classes and its static call graph. A line "A -> B: n" means that code in class A invokes methods or constructors of class B at n places in the source code. Calls within a class and calls to external libraries are not listed.
+
+Rules:
+1. Assign every listed class to exactly one microservice.
+2. Write each class name exactly as it is listed. Do not add, rename or omit classes.
+3. Choose the number of microservices yourself. It must be at least 2.
+
+Classes ($class_count):
+$class_list
+
+Call graph ($edge_count edges, $call_count calls):
+$edge_list
+
+Answer with one JSON object and no other text, in this format:
+{"microservices": [{"name": "<service name>", "classes": ["<class name>", "<class name>"]}]}

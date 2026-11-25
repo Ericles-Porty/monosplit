@@ -1,0 +1,30 @@
+[
+  {
+    "accepted_runs": 5,
+    "ah_primary": "auto",
+    "ah_variants": [
+      "calls:average",
+      "calls:complete",
+      "calls:single",
+      "neighbors:average",
+      "neighbors:complete",
+      "neighbors:single"
+    ],
+    "app": "jpetstore",
+    "database": "monosplit_dry_run",
+    "hdbscan_min_cluster_size": 2,
+    "id": "dry_run",
+    "inferential": true,
+    "llm": "fake",
+    "max_failed_runs": 5,
+    "max_retries": 3,
+    "name": "dry-run",
+    "note": "Dry run of the whole pipeline with the offline fake client. Writes to its own MongoDB\ndatabase, monosplit_dry_run, which is never dumped: its numbers are not experimental data.\nIt reads the JPetStore graph from the main database.\n\nThe dry run also rehearses the hypothesis tests of the full experiment, on the fake\nclient's numbers. They test the code path only; the pilot itself is descriptive.",
+    "prompt_template": "decomposition_base",
+    "seed": 20261104,
+    "variants": [
+      "original",
+      "obfuscated"
+    ]
+  }
+]

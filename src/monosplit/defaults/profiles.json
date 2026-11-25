@@ -1,0 +1,108 @@
+[
+  {
+    "client": {
+      "seed": 1
+    },
+    "max_output_tokens": null,
+    "model": "fake",
+    "name": "fake",
+    "note": "Offline client for dry runs and tests. Never use it for experimental data.",
+    "pricing": {},
+    "provider": "fake",
+    "request": {},
+    "seed": null,
+    "temperature": null,
+    "template": false
+  },
+  {
+    "client": {
+      "timeout_s": 900
+    },
+    "max_output_tokens": 32000,
+    "model": "CHANGE-ME",
+    "name": "_anthropic",
+    "note": "Template for a Claude profile. Create a profile from it on the Configuration page and set\nthe model; the profile name identifies its runs.\n\nModel IDs (exact strings, no date suffix), list cached by the Anthropic API reference on\n2026-10-06: claude-opus-5-5, claude-sonnet-5-5, claude-haiku-5-5, claude-fable-5-1,\nclaude-opus-5, claude-sonnet-5, claude-opus-4-8.\n\nCredentials: ANTHROPIC_API_KEY in the environment, or an `ant auth login` profile.\n\nThe SDK in use (anthropic >= 2.0) sends API version 2026-10-21, which rejects\ntemperature, top_p and top_k on every model. Do not set temperature: Claude samples at\nthe default temperature 1.0, which is recorded as the fixed value.\n\napi_key_env = \"ANTHROPIC_API_KEY\"\n\nThinking depth. Claude Opus 5.5 defaults to \"medium\" and Claude Sonnet 5.5 to \"high\";\nset it explicitly so the configuration is recorded. Levels: low, medium, high, xhigh, max.\n\nUSD per million tokens, for the cost column of the log. Values from the cached price\ntable (2026-10-06): Opus 5.5 4.00 / 20.00; Sonnet 5.5 2.00 / 10.00; Haiku 5.5 0.10 / 0.50.\nConfirm on the provider's price page and record the date.\ninput_per_mtok = 4.00\noutput_per_mtok = 20.00\nsource = \"https://platform.claude.com/docs/en/about-claude/pricing\"\naccessed = \"YYYY-MM-DD\"",
+    "pricing": {},
+    "provider": "anthropic",
+    "request": {
+      "output_config": {
+        "effort": "high"
+      }
+    },
+    "seed": null,
+    "temperature": null,
+    "template": true
+  },
+  {
+    "client": {
+      "api_key_env": "GEMINI_API_KEY",
+      "timeout_s": 900
+    },
+    "max_output_tokens": 32000,
+    "model": "CHANGE-ME",
+    "name": "_gemini",
+    "note": "Template for a Gemini profile (Google Gen AI SDK). Create a profile from it on the\nConfiguration page and set the model. Credentials: GEMINI_API_KEY.\n\ntemperature = 1.0\n\nFields of GenerateContentConfig, passed as given. Thinking depth, for models that support it:\nthinking_config = { thinking_level = \"high\" }\n\ninput_per_mtok =\noutput_per_mtok =\nsource = \"\"\naccessed = \"YYYY-MM-DD\"",
+    "pricing": {},
+    "provider": "gemini",
+    "request": {},
+    "seed": null,
+    "temperature": null,
+    "template": true
+  },
+  {
+    "client": {
+      "base_url": "http://127.0.0.1:11434",
+      "timeout_s": 3600
+    },
+    "max_output_tokens": 32000,
+    "model": "CHANGE-ME",
+    "name": "_ollama",
+    "note": "Template for a local model in Ollama, through its native API. Create a profile from it on the\nConfiguration page and set the model: a tag listed by `ollama list` (download it first with\n`ollama pull <model>`). Nothing is billed and no key is needed. Ollama cloud models are refused.\n\nContext window: options.num_ctx in the request options is required. The server default depends\non the GPU (4096 tokens with less than 24 GB of VRAM) and would cut the larger prompts; the adapter\nsends num_ctx with every request and makes the server refuse a prompt that does not fit. The\nprompt plus the output limit must fit: DayTrader, the largest application, has about 10,100\nprompt tokens with Qwen 3.5, so num_ctx 49152 with the output limit of the hosted templates (32000)\nfits every application. A larger context takes more memory: qwen3.5:4b fits in 6 GB of GPU memory\nat 4k, but only two thirds of it at 49k.\n\nSeed: leave it empty. Each attempt gets its own seed, derived from the master seed of the\nexperiment and recorded with it, so the runs differ. Whether the same seed gives the same answer\nagain depends on the model (docs/decisions.md): it did for qwen3.5:4b, not for gpt-oss:20b.\n\nTemperature: empty uses the model's own default (Modelfile parameters, recorded with each variant).\n\nThinking, for models that have it (`ollama show <model>` lists the levels): \"think\": true or\nfalse, or \"low\" / \"medium\" / \"high\" for gpt-oss, e.g.\n{\"think\": \"high\", \"options\": {\"num_ctx\": 49152}}\n\nOther model options (top_p, top_k, ...) go under \"options\". The study does not use \"format\"\n(structured output): the treatment is the same prompt sent to the hosted models.\n\nMachine of the study: RTX 4050 Laptop GPU (6 GB), Ryzen 7 7735HS, 31 GB of RAM. With a 32k\ncontext, gpt-oss:20b keeps a quarter of itself in GPU memory and runs the rest on the CPU.",
+    "pricing": {
+      "input_per_mtok": 0.0,
+      "output_per_mtok": 0.0,
+      "source": "Local model in Ollama: no call is billed"
+    },
+    "provider": "ollama",
+    "request": {
+      "options": {
+        "num_ctx": 49152
+      }
+    },
+    "seed": null,
+    "temperature": null,
+    "template": true
+  },
+  {
+    "client": {
+      "api_key_env": "OPENAI_API_KEY",
+      "timeout_s": 900
+    },
+    "max_output_tokens": 32000,
+    "model": "CHANGE-ME",
+    "name": "_openai",
+    "note": "Template for an OpenAI profile (Chat Completions API). Create a profile from it on the\nConfiguration page and set the model. Credentials: OPENAI_API_KEY.\n\nPrefer a dated model snapshot over an alias, so the version stays fixed; the API\nreports the version it used, and every attempt records it.\n\nNon-reasoning models: set the temperature (the roteiro asks for a fixed value above 0).\nReasoning models may reject it; leave it unset and record the default.\ntemperature = 1.0\n\nReasoning models only:\nreasoning_effort = \"medium\"\n\nUSD per million tokens, from the provider's price page, with the access date.\ninput_per_mtok =\noutput_per_mtok =\nsource = \"\"\naccessed = \"YYYY-MM-DD\"",
+    "pricing": {},
+    "provider": "openai",
+    "request": {},
+    "seed": null,
+    "temperature": null,
+    "template": true
+  },
+  {
+    "client": {
+      "base_url": "http://localhost:11434/v1",
+      "timeout_s": 1800
+    },
+    "max_output_tokens": 8192,
+    "model": "CHANGE-ME",
+    "name": "_openai_compatible",
+    "note": "Template for a server that implements the Chat Completions API: vLLM, LM Studio or a hosted\ngateway (OpenRouter, DeepSeek). Create a profile from it on the Configuration page.\n\nFor Ollama, use the provider ollama (template _ollama) instead. Through this endpoint the\ncontext window cannot be set per request, so the server default applies (4096 tokens with less\nthan 24 GB of VRAM) and longer prompts are cut without warning; nor are the model digest and\nthe server version recorded.\n\napi_key_env = \"OPENROUTER_API_KEY\"   # hosted gateways need a key; local servers do not\n\ninput_per_mtok = 0\noutput_per_mtok = 0",
+    "pricing": {},
+    "provider": "openai_compatible",
+    "request": {},
+    "seed": null,
+    "temperature": 1.0,
+    "template": true
+  }
+]

@@ -1,0 +1,11 @@
+# Python environment and caches
+.venv/
+__pycache__/
+*.pyc
+.pytest_cache/
+
+# Cloned applications, build outputs and dry runs with the fake LLM client
+work/
+
+# API keys, if kept in a local file
+.env

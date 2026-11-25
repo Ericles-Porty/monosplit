@@ -1,0 +1,29 @@
+[
+  {
+    "build": "maven-wrapper",
+    "build_args": [
+      "-B",
+      "-DskipTests",
+      "-Dformatter.skip=true",
+      "-Dimpsort.skip=true",
+      "-Dlicense.skip=true",
+      "-Dwhitespace.skip=true",
+      "-Drewrite.skip=true",
+      "-Djacoco.skip=true",
+      "clean",
+      "compile"
+    ],
+    "class_dirs": [
+      "target/classes"
+    ],
+    "commit": "ce8015be2c2658d0b657be20328e53045f3a9641",
+    "id": "jpetstore",
+    "name": "JPetStore",
+    "note": "Fork Ericles-Porty/jpetstore-6 of mybatis/jpetstore-6, tag monosplit-pin = commit of the release tag jpetstore-6.3.0 (unchanged copy). jpetstore-6.3.0 is the last release with the Stripes web layer and the 24 classes decomposed in the literature; jpetstore-6.4.0 (2026-08-15) migrated the web layer to Spring MVC and has 25 classes. The mybatis parent POM formats and rewrites sources during the build; the skip flags keep the compiled code identical to the pinned commit.",
+    "repository": "https://github.com/Ericles-Porty/jpetstore-6.git",
+    "source_roots": [
+      "src/main/java"
+    ],
+    "tag": "monosplit-pin"
+  }
+]

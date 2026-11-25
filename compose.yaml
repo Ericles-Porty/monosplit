@@ -1,0 +1,22 @@
+# Local MongoDB of the experiment. The database is the primary record of the runs and
+# results; `monosplit db dump` writes the readable copy kept in git (experimento/dump/).
+#
+#   docker compose up -d        start (data stays in the volume monosplit-mongo)
+#   docker compose stop         stop, keeping the data
+#
+# Never run `docker compose down -v`: it deletes the volume, and with it the runs that
+# were not dumped yet.
+
+services:
+  mongo:
+    image: mongo:8.0
+    container_name: monosplit-mongo
+    restart: unless-stopped
+    ports:
+      - "127.0.0.1:27017:27017"
+    volumes:
+      - monosplit-mongo:/data/db
+
+volumes:
+  monosplit-mongo:
+    name: monosplit-mongo
